@@ -1,0 +1,75 @@
+/*    Code used to compile data from the TCS3200 sensor. The code includes the range for subsequent data processing in Python. */
+
+#define S0 4
+#define S1 5
+#define S2 6
+#define S3 7
+#define SENSOR_OUT 8
+
+// Number of samples for average
+#define NUM_SAMPLES 5
+
+// Structure for calibration
+struct Calibration {
+  int minFreq;
+  int maxFreq;
+};
+
+// Calibrations (ADJUST TO YOUR SENSOR)
+Calibration redCal   = {25, 72};
+Calibration greenCal = {30, 90};
+Calibration blueCal  = {25, 70};
+
+void setup() {
+  pinMode(S0, OUTPUT);
+  pinMode(S1, OUTPUT);
+  pinMode(S2, OUTPUT);
+  pinMode(S3, OUTPUT);
+  pinMode(SENSOR_OUT, INPUT);
+
+  // Frequency scaling to 20%
+  digitalWrite(S0, HIGH);
+  digitalWrite(S1, LOW);
+
+  Serial.begin(9600);
+  Serial.println("time_ms,R,G,B");
+}
+
+long readFrequency() {
+  long sum = 0;
+
+  for (int i = 0; i < NUM_SAMPLES; i++) {
+    long duration = pulseIn(SENSOR_OUT, LOW, 100000); // timeout 100 ms
+    if (duration > 0) sum += duration;
+    delay(5);
+  }
+
+  return sum / NUM_SAMPLES;
+}
+
+int readColor(bool s2, bool s3, Calibration cal) {
+  digitalWrite(S2, s2);
+  digitalWrite(S3, s3);
+
+  long freq = readFrequency();
+
+  int value = map(freq, cal.minFreq, cal.maxFreq, 255, 0);
+  return constrain(value, 0, 255);
+}
+
+void loop() {
+  int red   = readColor(LOW,  LOW,  redCal);
+  int green = readColor(HIGH, HIGH, greenCal);
+  int blue  = readColor(LOW,  HIGH, blueCal);
+
+  // Salida CSV (ideal para Python / Pandas)
+  Serial.print(millis());
+  Serial.print(",");
+  Serial.print(red);
+  Serial.print(",");
+  Serial.print(green);
+  Serial.print(",");
+  Serial.println(blue);
+
+  delay(200);
+}
